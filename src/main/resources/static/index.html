@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minhas Tarefas (Todo)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 30px auto;
+            padding: 20px;
+            background-color: #f4f4f9;
+        }
+        .todo-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        input {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            color: white;
+        }
+        .btn-add { background-color: #28a745; }
+        .btn-delete { background-color: #dc3545; }
+        .btn-complete { background-color: #007bff; }
+        
+        .todo-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .todo-info {
+            flex-grow: 1;
+        }
+        .todo-info.concluida h4, .todo-info.concluida p {
+            text-decoration: line-through;
+            color: #888;
+        }
+        .todo-info h4 { margin: 0 0 5px 0; }
+        .todo-info p { margin: 0; font-size: 14px; color: #555; }
+        .actions { display: flex; gap: 5px; }
+    </style>
+</head>
+<body>
+
+    <div class="todo-container">
+        <h2>Gerenciador de Tarefas uwu</h2>
+        
+        <!-- Formulário para Criar -->
+        <form id="todoForm" class="form-group">
+            <input type="text" id="titulo" placeholder="Título" required style="flex-grow: 1;">
+            <input type="text" id="descricao" placeholder="Descrição" required style="flex-grow: 2;">
+            <button type="submit" class="btn-add">Criar</button>
+        </form>
+
+        <!-- Lista de Tarefas -->
+        <div id="todoList">
+            <!-- As tarefas aparecerão aqui -->
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8080/todos';
+
+        // Função para buscar e renderizar as tarefas na tela
+        async function carregarTodos() {
+            try {
+                const response = await fetch(API_URL);
+                const todos = await response.json();
+                
+                const todoList = document.getElementById('todoList');
+                todoList.innerHTML = '';
+
+                todos.forEach(todo => {
+                    const div = document.createElement('div');
+                    div.className = 'todo-item';
+                    
+                    const estaConcluida = todo.concluida ? 'concluida' : '';
+
+                    div.innerHTML = `
+                        <div class="todo-info ${estaConcluida}">
+                            <h4>#${todo.id} - ${todo.titulo}</h4>
+                            <p>${todo.descricao}</p>
+                        </div>
+                        <div class="actions">
+                            ${!todo.concluida ? `<button class="btn-complete" onclick="completarTodo(${todo.id})">Completar</button>` : ''}
+                            <button class="btn-delete" onclick="deletarTodo(${todo.id})">Deletar</button>
+                        </div>
+                    `;
+                    todoList.appendChild(div);
+                });
+            } catch (error) {
+                console.error("Erro ao carregar as tarefas:", error);
+            }
+        }
+
+        // Função para criar uma nova tarefa
+        document.getElementById('todoForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const novoTodo = {
+                titulo: document.getElementById('titulo').value,
+                descricao: document.getElementById('descricao').value,
+                concluida: false // Inicia sempre como falso
+            };
+
+            await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(novoTodo)
+            });
+
+            // Limpa o formulário e recarrega a lista
+            document.getElementById('todoForm').reset();
+            carregarTodos();
+        });
+
+        // Função para deletar
+        async function deletarTodo(id) {
+            await fetch(`${API_URL}/${id}`, {
+                method: 'DELETE'
+            });
+            carregarTodos();
+        }
+
+        // Função para completar
+        async function completarTodo(id) {
+            await fetch(`${API_URL}/${id}/concluir`, {
+                method: 'PATCH'
+            });
+            carregarTodos();
+        }
+
+        // Carrega as tarefas assim que a página abre
+        carregarTodos();
+    </script>
+
+</body>
+</html>
