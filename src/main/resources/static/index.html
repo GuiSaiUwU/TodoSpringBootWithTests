@@ -38,6 +38,10 @@
         .btn-add { background-color: #28a745; }
         .btn-delete { background-color: #dc3545; }
         .btn-complete { background-color: #007bff; }
+        .btn-edit { background-color: #6f42c1; }
+        .btn-cancel { background-color: #6c757d; }
+        .form-actions { display: flex; gap: 5px; }
+        .message { min-height: 20px; margin-bottom: 10px; color: #dc3545; }
         
         .todo-item {
             display: flex;
@@ -67,8 +71,12 @@
         <form id="todoForm" class="form-group">
             <input type="text" id="titulo" placeholder="Título" required style="flex-grow: 1;">
             <input type="text" id="descricao" placeholder="Descrição" required style="flex-grow: 2;">
-            <button type="submit" class="btn-add">Criar</button>
+            <div class="form-actions">
+                <button type="submit" id="submitButton" class="btn-add">Criar</button>
+                <button type="button" id="cancelButton" class="btn-cancel" hidden>Cancelar</button>
+            </div>
         </form>
+        <div id="message" class="message" role="alert"></div>
 
         <!-- Lista de Tarefas -->
         <div id="todoList">
@@ -77,12 +85,24 @@
     </div>
 
     <script>
-        const API_URL = 'http://localhost:8080/todos';
+        const API_URL = '/todos';
+        let todoEmEdicao = null;
+
+        function mostrarErro(mensagem) {
+            document.getElementById('message').textContent = mensagem;
+        }
+
+        function limparMensagem() {
+            document.getElementById('message').textContent = '';
+        }
 
         // Função para buscar e renderizar as tarefas na tela
         async function carregarTodos() {
             try {
                 const response = await fetch(API_URL);
+                if (!response.ok) {
+                    throw new Error('Não foi possível carregar as tarefas.');
+                }
                 const todos = await response.json();
                 
                 const todoList = document.getElementById('todoList');
@@ -101,6 +121,7 @@
                         </div>
                         <div class="actions">
                             ${!todo.concluida ? `<button class="btn-complete" onclick="completarTodo(${todo.id})">Completar</button>` : ''}
+                            <button class="btn-edit" onclick="editarTodo(${todo.id}, '${encodeURIComponent(todo.titulo)}', '${encodeURIComponent(todo.descricao)}')">Editar</button>
                             <button class="btn-delete" onclick="deletarTodo(${todo.id})">Deletar</button>
                         </div>
                     `;
@@ -108,45 +129,93 @@
                 });
             } catch (error) {
                 console.error("Erro ao carregar as tarefas:", error);
+                mostrarErro(error.message);
             }
         }
 
-        // Função para criar uma nova tarefa
+        // Função para criar ou editar uma tarefa
         document.getElementById('todoForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            
-            const novoTodo = {
+
+            const dadosTodo = {
                 titulo: document.getElementById('titulo').value,
-                descricao: document.getElementById('descricao').value,
-                concluida: false // Inicia sempre como falso
+                descricao: document.getElementById('descricao').value
             };
 
-            await fetch(API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(novoTodo)
-            });
+            try {
+                const url = todoEmEdicao === null ? API_URL : `${API_URL}/${todoEmEdicao}`;
+                const response = await fetch(url, {
+                    method: todoEmEdicao === null ? 'POST' : 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dadosTodo)
+                });
+                if (!response.ok) {
+                    throw new Error('Não foi possível salvar a tarefa.');
+                }
 
-            // Limpa o formulário e recarrega a lista
-            document.getElementById('todoForm').reset();
-            carregarTodos();
+                cancelarEdicao();
+                await carregarTodos();
+            } catch (error) {
+                console.error("Erro ao salvar a tarefa:", error);
+                mostrarErro(error.message);
+            }
         });
 
         // Função para deletar
         async function deletarTodo(id) {
-            await fetch(`${API_URL}/${id}`, {
-                method: 'DELETE'
-            });
-            carregarTodos();
+            if (!confirm('Deseja realmente deletar esta tarefa?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/${id}`, {
+                    method: 'DELETE'
+                });
+                if (!response.ok) {
+                    throw new Error('Não foi possível deletar a tarefa.');
+                }
+                await carregarTodos();
+            } catch (error) {
+                console.error("Erro ao deletar a tarefa:", error);
+                mostrarErro(error.message);
+            }
         }
 
         // Função para completar
         async function completarTodo(id) {
-            await fetch(`${API_URL}/${id}/concluir`, {
-                method: 'PATCH'
-            });
-            carregarTodos();
+            try {
+                const response = await fetch(`${API_URL}/${id}/concluir`, {
+                    method: 'PATCH'
+                });
+                if (!response.ok) {
+                    throw new Error('Não foi possível concluir a tarefa.');
+                }
+                await carregarTodos();
+            } catch (error) {
+                console.error("Erro ao concluir a tarefa:", error);
+                mostrarErro(error.message);
+            }
         }
+
+        function editarTodo(id, titulo, descricao) {
+            todoEmEdicao = id;
+            document.getElementById('titulo').value = decodeURIComponent(titulo);
+            document.getElementById('descricao').value = decodeURIComponent(descricao);
+            document.getElementById('submitButton').textContent = 'Salvar';
+            document.getElementById('cancelButton').hidden = false;
+            limparMensagem();
+            document.getElementById('titulo').focus();
+        }
+
+        function cancelarEdicao() {
+            todoEmEdicao = null;
+            document.getElementById('todoForm').reset();
+            document.getElementById('submitButton').textContent = 'Criar';
+            document.getElementById('cancelButton').hidden = true;
+            limparMensagem();
+        }
+
+        document.getElementById('cancelButton').addEventListener('click', cancelarEdicao);
 
         // Carrega as tarefas assim que a página abre
         carregarTodos();

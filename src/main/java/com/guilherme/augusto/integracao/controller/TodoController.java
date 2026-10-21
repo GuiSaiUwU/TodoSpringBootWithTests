@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -31,6 +32,19 @@ public class TodoController {
     @PostMapping(path = "/todos")
     public ResponseEntity<Object> criar(@RequestBody Todo todo) {
         return ResponseEntity.ok(todoRepository.save(todo));
+    }
+
+    @PutMapping(path = "/todos/{id}")
+    public ResponseEntity<Object> editar(@PathVariable(value = "id") Long id, @RequestBody Todo dadosAtualizados) {
+        var todoOptional = todoRepository.findById(id);
+        if (todoOptional.isPresent()) {
+            Todo todo = todoOptional.get();
+            todo.setTitulo(dadosAtualizados.getTitulo());
+            todo.setDescricao(dadosAtualizados.getDescricao());
+            return ResponseEntity.ok(todoRepository.save(todo));
+        } else {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
     }
 
     @PatchMapping(path = "/todos/{id}/concluir")
